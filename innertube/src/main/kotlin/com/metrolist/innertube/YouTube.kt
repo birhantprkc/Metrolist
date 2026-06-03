@@ -1074,7 +1074,9 @@ object YouTube {
                             ?.sectionListRenderer
                             ?.contents
                             ?.firstOrNull()
-                            ?.musicPlaylistShelfRenderer
+                    val twoColContents =
+                        twoColShelf?.musicPlaylistShelfRenderer?.contents
+                            ?: twoColShelf?.musicShelfRenderer?.contents
                     val singleColShelf =
                         response.contents
                             ?.singleColumnBrowseResultsRenderer
@@ -1085,9 +1087,10 @@ object YouTube {
                             ?.sectionListRenderer
                             ?.contents
                             ?.firstOrNull()
-                            ?.musicPlaylistShelfRenderer
-                    (twoColShelf ?: singleColShelf)
-                        ?.contents
+                    val singleColContents =
+                        singleColShelf?.musicPlaylistShelfRenderer?.contents
+                            ?: singleColShelf?.musicShelfRenderer?.contents
+                    (twoColContents ?: singleColContents)
                         ?.getItems()
                         ?.mapNotNull { PlaylistPage.fromMusicResponsiveListItemRenderer(it) }
                         ?: emptyList()
@@ -1100,7 +1103,12 @@ object YouTube {
                             ?.sectionListRenderer
                             ?.contents
                             ?.firstOrNull()
-                            ?.musicPlaylistShelfRenderer
+                    val twoColContents =
+                        twoColShelf?.musicPlaylistShelfRenderer?.contents
+                            ?: twoColShelf?.musicShelfRenderer?.contents
+                    val twoColContinuations =
+                        twoColShelf?.musicPlaylistShelfRenderer?.continuations
+                            ?: twoColShelf?.musicShelfRenderer?.continuations
                     val singleColShelf =
                         response.contents
                             ?.singleColumnBrowseResultsRenderer
@@ -1111,9 +1119,15 @@ object YouTube {
                             ?.sectionListRenderer
                             ?.contents
                             ?.firstOrNull()
-                            ?.musicPlaylistShelfRenderer
-                    val shelf = twoColShelf ?: singleColShelf
-                    shelf?.contents?.getContinuation() ?: shelf?.continuations?.getContinuation()
+                    val singleColContents =
+                        singleColShelf?.musicPlaylistShelfRenderer?.contents
+                            ?: singleColShelf?.musicShelfRenderer?.contents
+                    val singleColContinuations =
+                        singleColShelf?.musicPlaylistShelfRenderer?.continuations
+                            ?: singleColShelf?.musicShelfRenderer?.continuations
+                    val mergedContents = twoColContents ?: singleColContents
+                    val mergedContinuations = twoColContinuations ?: singleColContinuations
+                    mergedContents?.getContinuation() ?: mergedContinuations?.getContinuation()
                 },
                 continuation =
                     response.contents
@@ -1726,7 +1740,18 @@ object YouTube {
                                                 ?.runs
                                                 ?.firstOrNull()
                                                 ?.text,
-                                        items = carouselItems,
+                                        items =
+                                            content.musicCarouselShelfRenderer.contents.mapNotNull { content ->
+                                                content.musicTwoRowItemRenderer?.let { renderer ->
+                                                    LibraryPage.fromMusicTwoRowItemRenderer(renderer)
+                                                        ?: RelatedPage.fromMusicTwoRowItemRenderer(renderer)
+                                                } ?: content.musicMultiRowListItemRenderer?.let { renderer ->
+                                                    PodcastPage.fromMusicMultiRowListItemRenderer(renderer)
+                                                } ?: content.musicResponsiveListItemRenderer?.let { renderer ->
+                                                    LibraryPage.fromMusicResponsiveListItemRenderer(renderer)
+                                                        ?: RelatedPage.fromMusicResponsiveListItemRenderer(renderer)
+                                                }
+                                            },
                                     )
                                 }
 
@@ -2025,7 +2050,7 @@ object YouTube {
     private fun convertToChartItem(renderer: MusicResponsiveListItemRenderer): YTItem? {
         return try {
             when {
-                renderer.flexColumns.size >= 3 && renderer.playlistItemData?.videoId != null -> {
+                renderer.flexColumns.size >= 3 && renderer.videoId != null -> {
                     val firstColumn =
                         renderer.flexColumns
                             .getOrNull(0)
@@ -2058,7 +2083,7 @@ object YouTube {
                             ?.text
 
                     SongItem(
-                        id = renderer.playlistItemData.videoId,
+                        id = renderer.videoId!!,
                         title = title,
                         artists = artists,
                         thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
@@ -2332,12 +2357,12 @@ object YouTube {
                         }
 
                         content.musicCarouselShelfRenderer != null -> {
-                            content.musicCarouselShelfRenderer.contents.mapNotNull { carouselContent ->
-                                carouselContent.musicTwoRowItemRenderer?.let { renderer ->
+                            content.musicCarouselShelfRenderer.contents.mapNotNull { content ->
+                                content.musicTwoRowItemRenderer?.let { renderer ->
                                     LibraryPage.fromMusicTwoRowItemRenderer(renderer)
-                                } ?: carouselContent.musicMultiRowListItemRenderer?.let { renderer ->
+                                } ?: content.musicMultiRowListItemRenderer?.let { renderer ->
                                     PodcastPage.fromMusicMultiRowListItemRenderer(renderer)
-                                } ?: carouselContent.musicResponsiveListItemRenderer?.let { renderer ->
+                                } ?: content.musicResponsiveListItemRenderer?.let { renderer ->
                                     LibraryPage.fromMusicResponsiveListItemRenderer(renderer)
                                 }
                             }
@@ -2578,8 +2603,8 @@ object YouTube {
             shelfContents
                 ?.mapNotNull { it.musicResponsiveListItemRenderer }
                 ?.mapNotNull { renderer ->
-                    val videoId = renderer.playlistItemData?.videoId ?: return@mapNotNull null
-                    val setVideoId = renderer.playlistItemData.playlistSetVideoId
+                    val videoId = renderer.videoId ?: return@mapNotNull null
+                    val setVideoId = renderer.playlistSetVideoId
                     val title =
                         renderer.flexColumns
                             .firstOrNull()
@@ -2636,7 +2661,7 @@ object YouTube {
                 ?.flatMap { section ->
                     section.musicShelfRenderer?.contents?.mapNotNull { content ->
                         content.musicResponsiveListItemRenderer?.let { renderer ->
-                            val videoId = renderer.playlistItemData?.videoId ?: return@mapNotNull null
+                            val videoId = renderer.videoId ?: return@mapNotNull null
                             val title =
                                 renderer.flexColumns
                                     .firstOrNull()
